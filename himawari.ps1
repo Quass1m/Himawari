@@ -10,15 +10,13 @@
 #
 #
 
-$latestInfoUri = "http://himawari8-dl.nict.go.jp/himawari8/img/D531106/latest.json?" + (New-Guid).ToString();
-$latestInfo = Invoke-RestMethod -Uri $latestInfoUri
+#$latestInfoUri = "http://himawari8-dl.nict.go.jp/himawari8/img/D531106/latest.json?" + (New-Guid).ToString();
+#$latestInfo = Invoke-RestMethod -Uri $latestInfoUri
 
-$now = Get-Date $latestInfo.date;
+#$now = Get-Date $latestInfo.date;
 
-$width = 550
-$level = "4d" #Level can be 4d, 8d, 16d, 20d 
-$numblocks = 4 #this apparently corresponds directly with the level, keep this exactly the same as level without the 'd'
-$timeString = $now.ToString("yyyy/MM/dd/HHmmss")
+$width = 11000
+$height = 11000
 
 #Create the folder My Pictures\Himawari\ if it doesnt exist
 $outpath = [Environment]::GetFolderPath("MyPictures") + "\Himawari\"
@@ -28,56 +26,45 @@ if(!(Test-Path -Path $outpath ))
 }
 
 #The filename that will be saved:
-#Uncomment this to have the files accumulate in the directory:
-#$outfile = "$year$month$day"+"_" + $time + ".jpg" 
-#Use this to have the script just store the latest file only:
 $outfile = "latest.jpg" 
 
 
-$url = "http://himawari8-dl.nict.go.jp/himawari8/img/D531106/$level/$width/$timeString"
-
+$url = "http://rammb.cira.colostate.edu/ramsdis/online/images/latest_hi_res/himawari-8/full_disk_ahi_natural_color.jpg"
 [void][reflection.assembly]::LoadWithPartialName("System.Windows.Forms")
 
-$image = New-Object System.Drawing.Bitmap(($width * $numblocks), ($width * $numblocks))
+$image = New-Object System.Drawing.Bitmap(($width), ($height))
 $graphics = [System.Drawing.Graphics]::FromImage($image)
 $graphics.Clear([System.Drawing.Color]::Black)
 
-for ($y = 0; $y -lt $numblocks; $y++)
+Write-Output "Downloading: $url"   
+ 
+try
 {
-for ($x = 0; $x -lt $numblocks; $x++)
-{
-    $thisurl = $url + "_" + [String]$x + "_" + [String]$y + ".png"
-    Write-Output "Downloading: $thisurl"
     
-    try
-    {
-    
-        $request = [System.Net.WebRequest]::create($thisurl)
-        $response = $request.getResponse()
-        $HTTP_Status = [int]$response.StatusCode
-        If ($HTTP_Status -eq 200)
-        { 
-            $imgblock = [System.Drawing.Image]::fromStream($response.getResponseStream())
-            $graphics.DrawImage($imgblock,($x*$width),($y*$width) , $width, $width)   
-            $imgblock.dispose()
-            $response.Close()
-        }
-    }
-    Catch
-    {
-        $ErrorMessage = $_.Exception.Message
-        $FailedItem = $_.Exception.ItemName
-        Write-Output "Failed! $ErrorMessage with $FailedItem"
+    $request = [System.Net.WebRequest]::create($url)
+    $response = $request.getResponse()
+    $HTTP_Status = [int]$response.StatusCode
+    If ($HTTP_Status -eq 200)
+    { 
+        $imgblock = [System.Drawing.Image]::fromStream($response.getResponseStream())
+        $graphics.DrawImage($imgblock, 0, 0)   
+        $imgblock.dispose()
+        $response.Close()
     }
 }
+Catch
+{
+    $ErrorMessage = $_.Exception.Message
+    $FailedItem = $_.Exception.ItemName
+    Write-Output "Failed! $ErrorMessage with $FailedItem"
 }
-
 
 $qualityEncoder = [System.Drawing.Imaging.Encoder]::Quality
 $encoderParams = New-Object System.Drawing.Imaging.EncoderParameters(1)
 
 # Set JPEG quality level here: 0 - 100 (inclusive bounds)
-$encoderParams.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter($qualityEncoder, 90)
+$qualityValue = 95
+$encoderParams.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter($qualityEncoder, $qualityValue)
 $jpegCodecInfo = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | where {$_.MimeType -eq 'image/jpeg'}
 
 $image.save(($outpath + $outfile), $jpegCodecInfo, $encoderParams)
